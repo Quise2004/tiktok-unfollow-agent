@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TikTok Unfollow Agent</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --panel: #16161e;
+      --panel-2: #1e1e28;
+      --accent: #fe2c55;
+      --accent-hover: #ff4566;
+      --accent-2: #25f4ee;
+      --text: #f1f1f1;
+      --muted: #8a8a96;
+      --border: #2a2a36;
+      --ok: #25f4ee;
+      --warn: #ffb020;
+      --err: #fe2c55;
+      --green: #00d68f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    /* Header */
+    header {
+      padding: 16px 18px;
+      background: linear-gradient(135deg, #fe2c55 0%, #ff5e7e 100%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--accent);
+      display: grid; place-items: center;
+      font-weight: 900;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 700; }
+    header .sub { font-size: 11px; opacity: .85; margin-top: 2px; }
+
+    .body { padding: 16px 18px; }
+
+    /* Status pill */
+    .status {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--muted); flex-shrink: 0;
+    }
+    .dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot.err { background: var(--err); }
+    .dot.run { background: var(--warn); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    /* Section headers */
+    .section-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted); margin-bottom: 8px;
+    }
+
+    /* Top-level tool tabs (Unfollow / Delete Posts) */
+    .tool-tabs {
+      display: flex; gap: 0;
+      margin-bottom: 14px;
+      background: var(--panel);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .tool-tab {
+      flex: 1; padding: 11px 8px;
+      text-align: center;
+      font-size: 12px; font-weight: 700;
+      cursor: pointer; user-select: none;
+      transition: .15s;
+      color: var(--muted);
+      border-bottom: 2.5px solid transparent;
+    }
+    .tool-tab:hover { color: var(--text); }
+    .tool-tab.active {
+      color: var(--accent);
+      background: rgba(254,44,85,.08);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Coming Soon placeholder */
+    .coming-soon {
+      background: var(--panel);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 28px 18px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .coming-soon-icon {
+      font-size: 34px;
+      margin-bottom: 10px;
+      filter: grayscale(.2);
+    }
+    .coming-soon-title {
+      font-size: 14px; font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .coming-soon-sub {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Mode toggle */
+    .mode-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      margin-bottom: 14px;
+    }
+    .mode {
+      padding: 10px 8px;
+      border-radius: 10px;
+      background: var(--panel);
+      border: 1.5px solid var(--border);
+      cursor: pointer;
+      text-align: center;
+      font-size: 12px; font-weight: 600;
+      transition: .15s;
+      user-select: none;
+    }
+    .mode:hover { border-color: var(--accent); }
+    .mode.active {
+      background: rgba(254,44,85,.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Number input */
+    .count-row { margin-bottom: 14px; }
+    .count-row label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    input[type="number"] {
+      width: 100%;
+      background: var(--panel);
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px; font-weight: 600;
+      outline: none;
+      transition: .15s;
+    }
+    input[type="number"]:focus { border-color: var(--accent); }
+
+    /* Quota / billing card */
+    .quota-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .quota-top {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .quota-label { font-size: 13px; font-weight: 600; }
+    .quota-left { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .badge {
+      font-size: 10px; font-weight: 800;
+      padding: 3px 8px; border-radius: 6px;
+      background: var(--accent); color: #fff;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .badge.unlimited { background: var(--green); color: #000; }
+
+    .buy-btn {
+      width: 100%;
+      padding: 11px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #ff5e7e);
+      color: #fff;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+      transition: .15s;
+    }
+    .buy-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(254,44,85,.4); }
+    .buy-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .pay-status {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .pay-status.ok { color: var(--green); }
+    .pay-status.err { color: var(--err); }
+    .pay-status.spin { color: var(--accent-2); }
+
+    .unlocked-banner {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0,214,143,.1);
+      border: 1px solid rgba(0,214,143,.3);
+      color: var(--green);
+      font-size: 12px; font-weight: 600;
+    }
+
+    /* Options */
+    .opts {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      margin-bottom: 14px;
+    }
+    .opt {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--muted);
+      cursor: pointer; user-select: none;
+    }
+    .opt input { accent-color: var(--accent); width: 14px; height: 14px; }
+
+    /* Action buttons */
+    .actions { display: flex; gap: 8px; margin-bottom: 12px; }
+    .btn-start {
+      flex: 1; padding: 12px;
+      border-radius: 10px; border: none;
+      background: var(--accent); color: #fff;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: .15s;
+    }
+    .btn-start:hover { background: var(--accent-hover); }
+    .btn-start:disabled { background: #444; cursor: not-allowed; }
+    .btn-stop {
+      flex: 1; padding: 12px;
+      border-radius: 10px;
+      border: 1.5px solid var(--err);
+      background: transparent; color: var(--err);
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: .15s;
+    }
+    .btn-stop:hover { background: rgba(254,44,85,.1); }
+
+    /* Progress */
+    .progress-wrap { margin-bottom: 12px; }
+    .progress-bar {
+      height: 8px;
+      background: var(--panel);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar > div {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width .3s;
+      border-radius: 99px;
+    }
+    .progress-text {
+      display: flex; justify-content: space-between;
+      margin-top: 6px;
+      font-size: 11px; color: var(--muted);
+    }
+
+    /* Log */
+    .log-toggle {
+      font-size: 11px; color: var(--muted);
+      cursor: pointer; user-select: none;
+      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .log-toggle:hover { color: var(--text); }
+    .log {
+      max-height: 120px;
+      overflow-y: auto;
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      color: #cfcfd6;
+      display: none;
+    }
+    .log.show { display: block; }
+    .log .line { white-space: pre-wrap; word-break: break-word; margin-bottom: 2px; }
+    .log .line.err { color: var(--err); }
+    .log .line.ok { color: var(--ok); }
+    .log .line.warn { color: var(--warn); }
+
+    /* Footer */
+    footer {
+      padding: 10px 18px;
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Auto-start countdown banner */
+    .autostart-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(255,176,32,.12);
+      border: 1px solid rgba(255,176,32,.4);
+      color: var(--warn);
+      font-size: 12px; font-weight: 600;
+      margin-bottom: 12px;
+      animation: toastIn .2s ease;
+    }
+    .autostart-banner .as-count { font-weight: 800; }
+    .autostart-cancel {
+      padding: 5px 11px;
+      border-radius: 8px;
+      border: 1px solid var(--warn);
+      background: transparent;
+      color: var(--warn);
+      font-size: 11px; font-weight: 700;
+      cursor: pointer;
+      transition: .15s;
+    }
+    .autostart-cancel:hover { background: rgba(255,176,32,.15); }
+
+    /* Utility */
+    .hidden { display: none !important; }
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast notifications */
+    .toast-wrap {
+      position: fixed;
+      top: 10px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex; flex-direction: column; gap: 8px;
+      width: calc(100% - 24px); max-width: 340px;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 11px 13px;
+      border-radius: 10px;
+      font-size: 12px; font-weight: 600;
+      box-shadow: 0 6px 20px rgba(0,0,0,.45);
+      animation: toastIn .25s ease;
+      border: 1px solid;
+      line-height: 1.35;
+      pointer-events: auto;
+    }
+    .toast.info { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+    .toast.ok   { background: rgba(0,214,143,.15); color: var(--green); border-color: rgba(0,214,143,.45); }
+    .toast.err  { background: rgba(254,44,85,.18); color: var(--err);  border-color: rgba(254,44,85,.5); }
+    .toast.warn { background: rgba(255,176,32,.15); color: var(--warn); border-color: rgba(255,176,32,.45); }
+    .toast.fading { opacity: 0; transform: translateY(-8px); transition: opacity .3s, transform .3s; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Modal alert popup — blocks until dismissed. Used for errors & important events. */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 200;
+      display: none;
+      align-items: center; justify-content: center;
+      padding: 18px;
+      animation: fadeIn .15s ease;
+    }
+    .modal-overlay.show { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal-box {
+      width: 100%; max-width: 320px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.6);
+      overflow: hidden;
+      animation: modalIn .2s ease;
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+    .modal-bar { height: 4px; }
+    .modal-bar.err  { background: var(--err); }
+    .modal-bar.ok   { background: var(--green); }
+    .modal-bar.warn { background: var(--warn); }
+    .modal-bar.info { background: var(--accent-2); }
+    .modal-body { padding: 18px 18px 14px; }
+    .modal-title {
+      font-size: 14px; font-weight: 800;
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .modal-title.err  { color: var(--err); }
+    .modal-title.ok   { color: var(--green); }
+    .modal-title.warn { color: var(--warn); }
+    .modal-title.info { color: var(--accent-2); }
+    .modal-msg {
+      font-size: 12.5px; line-height: 1.5;
+      color: var(--text);
+    }
+    .modal-actions {
+      padding: 12px 18px 16px;
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .modal-btn {
+      padding: 9px 16px;
+      border-radius: 9px; border: none;
+      font-size: 12px; font-weight: 700;
+      cursor: pointer;
+      transition: .15s;
+    }
+    .modal-btn.primary {
+      background: var(--accent); color: #fff;
+    }
+    .modal-btn.primary:hover { background: var(--accent-hover); }
+    .modal-btn.ghost {
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .modal-btn.ghost:hover { border-color: var(--muted); }
+    .modal-btn.upgrade {
+      background: linear-gradient(135deg, var(--accent), #ff5e7e); color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <!-- Modal alert popup (blocks until dismissed) -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-box">
+      <div class="modal-bar err" id="modalBar"></div>
+      <div class="modal-body">
+        <div class="modal-title err" id="modalTitle">Notice</div>
+        <div class="modal-msg" id="modalMsg"></div>
+      </div>
+      <div class="modal-actions" id="modalActions">
+        <button class="modal-btn primary" id="modalOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <div class="logo" id="logoBtn">U</div>
+    <div>
+      <h1>TikTok Unfollow Agent</h1>
+      <div class="sub">Bulk unfollow — fast & easy</div>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- Status -->
+    <div class="status" id="status">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">Checking page…</span>
+    </div>
+
+    <!-- Auto-start countdown (shown on popup open) -->
+    <div class="autostart-banner hidden" id="autostartBanner">
+      <span>Auto-starting in <span class="as-count" id="autostartCount">3</span>s — opening profile &amp; Following list…</span>
+      <button class="autostart-cancel" id="autostartCancel">Cancel</button>
+    </div>
+
+    <!-- Tool tabs: Unfollow / Delete Posts -->
+    <div class="tool-tabs">
+      <div class="tool-tab active" data-tool="unfollow">Unfollow</div>
+      <div class="tool-tab" data-tool="delete">Delete Posts</div>
+    </div>
+
+    <!-- ===== Unfollow tool ===== -->
+    <div id="unfollowSection">
+      <div class="section-title">Unfollow Mode</div>
+      <div class="mode-grid">
+        <div class="mode active" data-mode="count">Unfollow N</div>
+        <div class="mode" data-mode="all">Unfollow All</div>
+      </div>
+
+      <div class="count-row" id="countWrap">
+        <label>Number of accounts to unfollow</label>
+        <input type="number" id="count" min="1" max="2000" value="10" />
+      </div>
+    </div>
+
+    <!-- ===== Delete Posts tool (Coming Soon) ===== -->
+    <div id="deleteSection" class="hidden">
+      <div class="coming-soon">
+        <div class="coming-soon-icon">&#128296;</div>
+        <div class="coming-soon-title">Delete Posts — Coming Soon</div>
+        <div class="coming-soon-sub">
+          We're putting the finishing touches on bulk post deletion.
+          Stay tuned — this feature will be available in a future update.
+        </div>
+      </div>
+    </div>
+
+    <!-- Quota / Billing -->
+    <div class="section-title">Plan</div>
+    <div class="quota-card" id="quotaCard">
+      <div class="quota-top">
+        <div>
+          <div class="quota-label" id="quotaLabel">Free Plan</div>
+          <div class="quota-left" id="quotaLeft">5 of 5 actions remaining</div>
+        </div>
+        <span class="badge" id="quotaBadge">Free</span>
+      </div>
+
+      <!-- Buy button (free users) -->
+      <div id="buySection">
+        <button class="buy-btn" id="buyBtn">Unlock Unlimited — $5</button>
+        <div class="pay-status" id="payStatus"></div>
+      </div>
+
+      <!-- Unlocked banner (paid users) -->
+      <div class="unlocked-banner hidden" id="unlockedBanner">
+        <span>&#10003;</span> Unlimited mode active
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="section-title">Options</div>
+    <div class="opts">
+      <label class="opt"><input type="checkbox" id="shuffle" checked /> Randomize order</label>
+      <label class="opt"><input type="checkbox" id="dryRun" /> Dry run</label>
+      <label class="opt"><input type="checkbox" id="debug" /> Debug logs</label>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="actions">
+      <button class="btn-start" id="startBtn">Start Unfollowing</button>
+      <button class="btn-stop hidden" id="stopBtn">Stop</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap hidden" id="progressWrap">
+      <div class="progress-bar"><div id="progressFill"></div></div>
+      <div class="progress-text">
+        <span id="doneLabel">0 done</span>
+        <span id="targetLabel">/ 0</span>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-toggle" id="logToggle">&#9656; Show log</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <footer>
+    Runs locally in your browser. No data leaves your device.
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
