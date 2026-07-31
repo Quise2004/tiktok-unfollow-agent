@@ -310,6 +310,32 @@
       border-top: 1px solid var(--border);
     }
 
+    /* How-to guide */
+    .howto {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .howto-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted); margin-bottom: 10px;
+    }
+    .howto-steps { display: flex; flex-direction: column; gap: 10px; }
+    .howto-step { display: flex; gap: 10px; align-items: flex-start; }
+    .howto-num {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: grid; place-items: center;
+      font-size: 11px; font-weight: 800;
+    }
+    .howto-text { font-size: 12px; line-height: 1.45; color: var(--text); }
+    .howto-text b { font-weight: 700; }
+
     /* Auto-start countdown banner */
     .autostart-banner {
       display: flex; align-items: center; justify-content: space-between;
@@ -560,6 +586,25 @@
     <!-- Log -->
     <div class="log-toggle" id="logToggle">&#9656; Show log</div>
     <div class="log" id="log"></div>
+
+    <!-- How to use -->
+    <div class="howto">
+      <div class="howto-title">How to use</div>
+      <div class="howto-steps">
+        <div class="howto-step">
+          <span class="howto-num">1</span>
+          <span class="howto-text">Open <b>tiktok.com</b> and log in to your account.</span>
+        </div>
+        <div class="howto-step">
+          <span class="howto-num">2</span>
+          <span class="howto-text">Click the extension icon — it auto-opens your profile &amp; Following list.</span>
+        </div>
+        <div class="howto-step">
+          <span class="howto-num">3</span>
+          <span class="howto-text">Pick a count (or <b>Unfollow All</b>), then sit back — the agent does the rest.</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <footer>
