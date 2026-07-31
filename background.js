@@ -1,14 +1,11 @@
 // background.js — service worker.
 // Mostly a relay: forwards messages from the popup to the content script
 // (and vice versa). Also opens TikTok on install so the user can log in.
-// Finally, watches for the Stripe Payment Link's post-payment redirect to
-// the success URL and unlocks unlimited mode (no backend server — the
-// redirect itself is the proof of payment).
+// Finally, watches for the Stripe Checkout post-payment redirect to the
+// Render billing server's /success page and verifies the session to unlock
+// unlimited mode persistently (the popup may be closed during payment).
 
-// After a successful Stripe payment, the Payment Link redirects here.
-// Configure this exact URL as the "after payment" redirect in your Stripe
-// Payment Link settings. The extension watches for this URL and unlocks.
-const STRIPE_SUCCESS_URL = "https://www.tiktok.com/?ttu_paid=1";
+const BILLING_SERVER_URL = "https://tiktok-unfollow-billing.onrender.com";
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") {
@@ -32,36 +29,47 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 // ---------------------------------------------------------------- payment unlock
-// The buy button opens a Stripe Payment Link. After payment, Stripe
-// redirects to STRIPE_SUCCESS_URL. We watch for that redirect here (in the
-// service worker, which persists even when the popup is closed), and flip
-// unlimitedUnlocked on in storage. Any open popup is notified so it can
-// refresh its UI.
-//
-// NOTE: there is no server-side verification. We trust that reaching the
-// success URL means Stripe marked the payment successful (Stripe only
-// redirects there on success). The tradeoff: anyone who manually visits
-// STRIPE_SUCCESS_URL would also unlock. Acceptable for a $5 extension.
+// The buy button creates a Stripe Checkout session via the Render backend.
+// After payment, Stripe redirects to the billing server's /success?session_id=
+// page. We watch for that redirect here (in the service worker, which persists
+// even when the popup is closed), verify the session with the billing server,
+// and flip unlimitedUnlocked on in storage. Any open popup is notified so it
+// can refresh its UI.
 chrome.tabs.onUpdated.addListener(async (_tabId, _info, tab) => {
   if (!tab || !tab.url) return;
   let u;
   try { u = new URL(tab.url); } catch (_) { return; }
-  // Match the success redirect. We compare on origin+pathname+the ttu_paid
-  // flag so extra query params Stripe may append don't break the match.
-  const success = new URL(STRIPE_SUCCESS_URL);
-  const isSuccess =
-    u.origin === success.origin &&
-    u.pathname === success.pathname &&
-    u.searchParams.get("ttu_paid") === "1";
-  if (!isSuccess) return;
+  if (u.origin !== BILLING_SERVER_URL) return;
+  if (!u.pathname.startsWith("/success")) return;
+  const sessionId = u.searchParams.get("session_id");
+  if (!sessionId) return;
 
   // Already unlocked? Nothing to do.
-  const cur = await chrome.storage.local.get(["unlimitedUnlocked"]);
+  const cur = await chrome.storage.local.get(["unlimitedUnlocked", "__paidSessionSeen"]);
   if (cur.unlimitedUnlocked) return;
+  // Avoid re-processing the same session across multiple onUpdated fires.
+  if (cur.__paidSessionSeen === sessionId) return;
+  await chrome.storage.local.set({ __paidSessionSeen: sessionId });
 
-  await chrome.storage.local.set({ unlimitedUnlocked: true });
-  // Notify any open popup so it can refresh its quota UI immediately.
-  try {
-    await chrome.runtime.sendMessage({ source: "tt-unfollow", type: "PAYMENT_UNLOCKED" });
-  } catch (_) {}
+  // Verify with the billing server. Stripe marks the session paid by the
+  // time of the success redirect, but allow a few retries in case of lag.
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const res = await fetch(`${BILLING_SERVER_URL}/verify-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const json = await res.json();
+      if (json.ok && json.key) {
+        await chrome.storage.local.set({ unlimitedUnlocked: true });
+        // Notify any open popup so it can refresh its quota UI immediately.
+        try {
+          await chrome.runtime.sendMessage({ source: "tt-unfollow", type: "PAYMENT_UNLOCKED" });
+        } catch (_) {}
+        return;
+      }
+    } catch (_) {}
+    await new Promise((r) => setTimeout(r, 2000));
+  }
 });

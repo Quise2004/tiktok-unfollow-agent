@@ -34,11 +34,7 @@ const autostartCancel = $("autostartCancel");
 
 // --- Constants ---
 const FREE_TIER_LIMIT = 5;
-// Stripe Payment Link — the buy button opens this directly. After payment,
-// Stripe redirects to the success URL (configured in the Stripe dashboard),
-// which the background service worker detects and unlocks unlimited. No
-// backend server involved — the redirect itself is the proof of payment.
-const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/cNi8wQ2JxbjE2Ia3NI0sU04";
+const BILLING_SERVER_URL = "https://tiktok-unfollow-billing.onrender.com";
 
 let tool = "unfollow";      // "unfollow" or "delete"
 let mode = "count";         // unfollow sub-mode: "count" or "all"
@@ -242,16 +238,73 @@ async function setUnlimited(unlocked) {
   await loadQuota();
 }
 
-// --- Buy button (Stripe Payment Link) ---
-// Opens the Stripe Payment Link directly. The background service worker
-// watches for the post-payment redirect to the success URL and flips
-// unlimitedUnlocked on in storage. The popup refreshes its quota UI when
-// it receives PAYMENT_UNLOCKED.
-buyBtn.addEventListener("click", () => {
-  payStatus.className = "pay-status spin";
-  payStatus.textContent = "Opening Stripe checkout… complete payment in the new tab. Unlimited unlocks automatically once it's confirmed.";
-  chrome.tabs.create({ url: STRIPE_PAYMENT_LINK });
-  pushLog("Opened Stripe payment link", "ok");
+// --- Buy button (Stripe Checkout via Render backend) ---
+buyBtn.addEventListener("click", async () => {
+  buyBtn.disabled = true;
+  buyBtn.textContent = "Creating checkout...";
+  payStatus.className = "pay-status";
+  payStatus.textContent = "";
+
+  try {
+    const res = await fetch(`${BILLING_SERVER_URL}/create-checkout-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const json = await res.json();
+    if (!json.ok || !json.url) {
+      payStatus.className = "pay-status err";
+      payStatus.textContent = "Could not start checkout. Is the billing server running?";
+      buyBtn.disabled = false;
+      buyBtn.textContent = "Unlock Unlimited — $5";
+      return;
+    }
+
+    // Open Stripe Checkout in new tab.
+    chrome.tabs.create({ url: json.url });
+    payStatus.className = "pay-status";
+    payStatus.textContent = "Complete payment in the new tab. Waiting for confirmation...";
+    buyBtn.textContent = "Waiting for payment...";
+
+    // Poll until paid.
+    const sessionId = json.session_id;
+    let attempts = 0;
+    const maxAttempts = 120; // 5 minutes at 2.5s intervals
+    const poll = setInterval(async () => {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        clearInterval(poll);
+        payStatus.className = "pay-status err";
+        payStatus.textContent = "Timed out waiting for payment. Try again.";
+        buyBtn.disabled = false;
+        buyBtn.textContent = "Unlock Unlimited — $5";
+        return;
+      }
+      try {
+        const vres = await fetch(`${BILLING_SERVER_URL}/verify-session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+        const vjson = await vres.json();
+        if (vjson.ok && vjson.key) {
+          clearInterval(poll);
+          // Payment confirmed — unlock unlimited immediately.
+          await setUnlimited(true);
+          payStatus.className = "pay-status ok";
+          payStatus.textContent = "Payment confirmed! Unlimited unlocked.";
+          pushLog("Unlimited unlocked via Stripe payment", "ok");
+          buyBtn.disabled = false;
+          buyBtn.textContent = "Unlock Unlimited — $5";
+        }
+      } catch (_) { /* keep polling */ }
+    }, 2500);
+  } catch (e) {
+    payStatus.className = "pay-status err";
+    payStatus.textContent = "Can't reach billing server. Make sure it's running.";
+    buyBtn.disabled = false;
+    buyBtn.textContent = "Unlock Unlimited — $5";
+  }
 });
 
 // ================================================================ Tab / content script
