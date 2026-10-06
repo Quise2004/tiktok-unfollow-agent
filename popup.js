@@ -34,7 +34,7 @@ const autostartCancel = $("autostartCancel");
 
 // --- Constants ---
 const FREE_TIER_LIMIT = 5;
-const BILLING_SERVER_URL = "https://tiktok-unfollow-billing.onrender.com";
+const BILLING_SERVER_URL = "https://tiktok-unfollow-billing.shark-chat.workers.dev";
 
 let tool = "unfollow";      // "unfollow" or "delete"
 let mode = "count";         // unfollow sub-mode: "count" or "all"

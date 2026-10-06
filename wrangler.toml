@@ -1,0 +1,17 @@
+name = "tiktok-unfollow-billing"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+STRIPE_PAYMENT_LINK_URL = "https://buy.stripe.com/6oU5kF2XFewhcHYfoGdjO04"
+CORS_ORIGIN = "*"
+# Public URL of this worker — used for docs/logging only.
+SERVER_URL = "https://tiktok-unfollow-billing.shark-chat.workers.dev"
+
+# STRIPE_SECRET_KEY is set via: npx wrangler secret put STRIPE_SECRET_KEY
+
+[[d1_databases]]
+binding = "DB"
+database_name = "billing-db"
+database_id = "924279e0-05b9-4d2f-b148-afb15a73b462"

@@ -5,7 +5,7 @@
 // Render billing server's /success page and verifies the session to unlock
 // unlimited mode persistently (the popup may be closed during payment).
 
-const BILLING_SERVER_URL = "https://tiktok-unfollow-billing.onrender.com";
+const BILLING_SERVER_URL = "https://tiktok-unfollow-billing.shark-chat.workers.dev";
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") {

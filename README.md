@@ -56,8 +56,11 @@ optionally randomize order, and watch progress in the popup. Nothing leaves your
   **Unfollow**, scrolls to load more, and reports `PROGRESS` / `LOG` / `DONE`
   back to the popup. Enforces the free-tier cap.
 - `background.js` — minimal service worker; opens the following page on install.
-- `server.js` — Express + Stripe billing server. Serves a Payment Link with a
-  unique reference, verifies payments, and stores unlock keys in SQLite.
+- `server.js` — Express + Stripe billing server (self-host / local dev).
+  Serves a Payment Link with a unique reference, verifies payments, and
+  stores unlock keys in SQLite.
+- `worker.js` + `wrangler.toml` — Cloudflare Worker port of the billing server
+  (production). Same endpoints, backed by a D1 database instead of SQLite.
 - `icons/` — generated PNG icons (see `generate-icons.js`).
 
 ## Free tier & unlocking unlimited
@@ -70,34 +73,31 @@ optionally randomize order, and watch progress in the popup. Nothing leaves your
 
 ## Run the billing server
 
-1. Create a Stripe Payment Link at <https://dashboard.stripe.com/payment-links>
-   for the $5 unlock. Copy the link URL (`https://buy.stripe.com/...`).
-2. (Recommended) In the payment link's settings, set **After payment →
-   Redirect customers to your website** to
-   `https://your-billing-domain/success?session_id={CHECKOUT_SESSION_ID}`
-   so the extension unlocks even if the popup was closed during payment.
-3. Copy `.env.example` to `.env` and fill in your keys:
-   - `STRIPE_SECRET_KEY` — your secret key
-   - `STRIPE_PAYMENT_LINK_URL` — the payment link URL from step 1
-   - `BILLING_SERVER_URL` — `http://localhost:4242` for local testing
-   - `CORS_ORIGIN` — `*` for local testing; restrict to your extension origin in production
-3. Install dependencies and start:
-   ```bash
-   npm install
-   npm start
-   ```
-   For production, run it with `pm2`, `systemd`, or Docker so it stays up forever.
-4. The extension popup is already configured to call `http://localhost:4242`.
-   Change `BILLING_SERVER_URL` in `popup.js` to your production HTTPS URL.
+Production runs as a Cloudflare Worker (`worker.js`):
+
+```bash
+npx wrangler deploy
+npx wrangler secret put STRIPE_SECRET_KEY   # paste your sk_live_... key
+```
+
+The payment link and D1 database are already provisioned — `wrangler.toml`
+points at the `billing-db` D1 database and the payment link var. The link's
+after-payment redirect is set to `<worker>/success?session_id={CHECKOUT_SESSION_ID}`
+so the extension unlocks even if the popup was closed during payment.
+
+For local dev with the Express version (`server.js`) instead:
+
+```bash
+npm install
+npm start   # reads .env — see .env.example
+```
 
 ## Production checklist
 
-- Restrict `CORS_ORIGIN` to your Chrome extension ID (`chrome-extension://YOUR_ID`).
-- Serve the billing server over HTTPS.
-- Configure the payment link's after-payment redirect (step 2 above) so
-  background verification works even when the popup is closed.
+- Restrict `CORS_ORIGIN` (in `wrangler.toml`) to your Chrome extension ID
+  (`chrome-extension://YOUR_ID`).
 - Keep `.env` and `billing.db` out of git (already ignored by `.gitignore`).
-- Add rate limiting and input validation to `server.js` before taking real payments.
+- Add rate limiting to `worker.js` / `server.js` before taking real payments.
 - Consider a Stripe `checkout.session.completed` webhook for durable payment
   fulfillment.
 

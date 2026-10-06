@@ -7,7 +7,7 @@
   "host_permissions": [
     "https://www.tiktok.com/*",
     "https://tiktok.com/*",
-    "https://tiktok-unfollow-billing.onrender.com/*"
+    "https://tiktok-unfollow-billing.shark-chat.workers.dev/*"
   ],
   "action": {
     "default_popup": "popup.html",
