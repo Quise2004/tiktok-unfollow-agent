@@ -4,7 +4,7 @@ compatibility_date = "2026-10-01"
 workers_dev = true
 
 [vars]
-STRIPE_PAYMENT_LINK_URL = "https://buy.stripe.com/6oU5kF2XFewhcHYfoGdjO04"
+STRIPE_PAYMENT_LINK_URL = "https://buy.stripe.com/dRmbJ38hZbk56jA6SadjO00"
 CORS_ORIGIN = "*"
 # Public URL of this worker — used for docs/logging only.
 SERVER_URL = "https://tiktok-unfollow-billing.shark-chat.workers.dev"

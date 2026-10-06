@@ -66,7 +66,7 @@ optionally randomize order, and watch progress in the popup. Nothing leaves your
 ## Free tier & unlocking unlimited
 
 - Free users can unfollow **3 accounts** total (stored in `chrome.storage.local`).
-- The popup shows how many are left, a **Buy unlimited unlock — $5** button, and
+- The popup shows how many are left, a **Unlock Unlimited — $5/mo** button, and
   a **Verify key** field.
 - Payments go through a Stripe Payment Link. The server issues a unique
   unlock key only after the matching Checkout Session is `paid`.

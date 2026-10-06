@@ -21,7 +21,7 @@ const Stripe = require("stripe");
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_PAYMENT_LINK_URL =
-  process.env.STRIPE_PAYMENT_LINK_URL || "https://buy.stripe.com/6oU5kF2XFewhcHYfoGdjO04";
+  process.env.STRIPE_PAYMENT_LINK_URL || "https://buy.stripe.com/dRmbJ38hZbk56jA6SadjO00";
 const PORT = parseInt(process.env.PORT || "4242", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 const SERVER_URL = process.env.BILLING_SERVER_URL || `http://localhost:${PORT}`;

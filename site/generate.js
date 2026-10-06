@@ -156,7 +156,7 @@ const PAGES = [
     sections: [
       ["The bulk unfollow problem", "TikTok has no native bulk unfollow. You're stuck clicking each row, confirming each dialog. For 800 follows that's 1,600 clicks. The agent does it in one run."],
       ["Pick a count or unfollow all", "Use Unfollow N to trim a batch (say 200), or Unfollow all to clear the list. Shuffle randomizes order so it doesn't always hammer the top of the list."],
-      ["What you get", "Manifest V3 extension, no external dependencies, no network calls. Free tier gives 3 unfollows to test. Unlock unlimited for a one-time $5."],
+      ["What you get", "Manifest V3 extension, no external dependencies, no network calls. Free tier gives 3 unfollows to test. Unlock unlimited for a $5/mo subscription."],
     ],
   },
   {
@@ -182,7 +182,7 @@ const PAGES = [
     sections: [
       ["Why most unfollow tools are risky", "Web-based unfollowers ask for your TikTok login. That's a credential leak waiting to happen. This extension never asks for a password — it runs in your own logged-in browser tab."],
       ["What makes this tool different", "Local-only, Manifest V3, zero network calls, zero dependencies. Dry run mode, Shuffle, Debug mode, live progress, and a Stop button. Free to try."],
-      ["Get it now", "Add to Chrome, open your following list, hit Start. Three unfollows free; unlock unlimited for a one-time $5."],
+      ["Get it now", "Add to Chrome, open your following list, hit Start. Three unfollows free; unlock unlimited for a $5/mo subscription."],
     ],
   },
   {
@@ -195,7 +195,7 @@ const PAGES = [
     sections: [
       ["Apps vs. extensions", "Mobile apps can't automate TikTok's web UI. Web apps want your credentials. A Chrome extension sits inside the page you're already logged into — no password ever leaves your hands."],
       ["Install in 30 seconds", "Add to Chrome, pin it, open tiktok.com/following, click the icon, hit Start. That's the whole onboarding."],
-      ["Pricing", "Free tier: 3 unfollows. Unlimited: one-time $5 via Stripe. No subscription, no recurring charge."],
+      ["Pricing", "Free tier: 3 unfollows. Unlimited: $5/mo via Stripe, cancel anytime."],
     ],
   },
   {
@@ -221,7 +221,7 @@ const PAGES = [
     sections: [
       ["Unfollow all vs. unfollow N", "Unfollow all keeps going until the list is exhausted. Unfollow N stops after a count you set — useful for pacing over several days."],
       ["Don't get rate-limited", "Enable Shuffle and let the agent's randomized delays do their job. Run in batches across days if your list is huge. Dry run first to preview."],
-      ["Start free", "Three unfollows on the house. Unlock unlimited for a one-time $5 — no subscription."],
+      ["Start free", "Three unfollows on the house. Unlock unlimited for a $5/mo subscription — cancel anytime."],
     ],
   },
   {
@@ -260,7 +260,7 @@ const PAGES = [
     sections: [
       ["Remove follows, keep control", "You pick the count or unfollow all. The agent never does anything you didn't ask for. Stop halts instantly."],
       ["No password, ever", "The extension uses your existing logged-in TikTok tab. It never sees or stores your password."],
-      ["Try it free", "Three unfollows free. Like it? Unlock unlimited for a one-time $5."],
+      ["Try it free", "Three unfollows free. Like it? Unlock unlimited for a $5/mo subscription."],
     ],
   },
   {
@@ -286,7 +286,7 @@ const PAGES = [
     sections: [
       ["Bot, not cloud", "Cloud bots store your credentials and act on your behalf from their IPs — easy to detect and risky. A browser bot acts from your own session at your own pace."],
       ["Human-ish pacing", "Randomized delays between clicks plus optional Shuffle make the bot's pattern look less robotic. You control the speed by batching."],
-      ["Free to try", "Three unfollows free. Unlimited is a one-time $5 — no subscription, no recurring bot fee."],
+      ["Free to try", "Three unfollows free. Unlimited is a $5/mo subscription — cancel anytime."],
     ],
   },
   {
@@ -299,7 +299,7 @@ const PAGES = [
     sections: [
       ["What automation handles", "Finding visible Following buttons, clicking one, waiting for the confirm dialog, clicking Unfollow, scrolling to load more, repeating. All automatic."],
       ["What you still control", "Mode (N or all), Shuffle, Dry run, Debug, Start, Stop. You're the supervisor, not the clicker."],
-      ["Free + paid", "Free tier: 3 auto-unfollows. Unlimited: one-time $5."],
+      ["Free + paid", "Free tier: 3 auto-unfollows. Unlimited: $5/mo subscription."],
     ],
   },
   {
@@ -319,12 +319,12 @@ const PAGES = [
     slug: "free-tiktok-unfollow-tool",
     keyword: "free tiktok unfollow tool",
     title: "Free TikTok Unfollow Tool — 3 Unfollows Free, $5 Unlimited",
-    description: "A genuinely free TikTok unfollow tool. Try 3 unfollows free, no card. Unlock unlimited for a one-time $5. Chrome extension.",
+    description: "A genuinely free TikTok unfollow tool. Try 3 unfollows free, no card. Unlock unlimited for a $5/mo subscription. Chrome extension.",
     h1: "A Genuinely Free TikTok Unfollow Tool",
     heroSub: "Try it free — 3 unfollows, no credit card, no signup. Like it? Unlock unlimited for $5.",
     sections: [
       ["Free means free", "No trial timer, no card required. You get 3 real unfollows to test the whole flow end-to-end. The free count is stored locally in your browser."],
-      ["Unlock when you're ready", "Hit the cap? Pay $5 once via Stripe Checkout and get a unique unlock key. Paste it in the popup — unlimited forever. No subscription."],
+      ["Unlock when you're ready", "Hit the cap? Subscribe for $5/mo via Stripe and get a unique unlock key. Paste it in the popup — unlimited while subscribed. Cancel anytime."],
       ["Why free first", "You should know a tool works before you pay for it. The free tier lets you verify it on your actual following list."],
     ],
   },
@@ -364,7 +364,7 @@ const PAGES = [
     sections: [
       ["The cleanup workflow", "Open /following → extension → Unfollow N (say 200) → Shuffle on → Start. Come back to a tighter list. Repeat over a few days for huge lists."],
       ["Dry run first", "New to the tool? Enable Dry run to see exactly what it would click — no actual unfollows — before you commit."],
-      ["Free to try", "Three unfollows free. Unlimited for a one-time $5."],
+      ["Free to try", "Three unfollows free. Unlimited for a $5/mo subscription."],
     ],
   },
   {
@@ -405,7 +405,7 @@ function landingPage() {
     ["Human-ish pacing", "Randomized delays between actions to look less robotic."],
     ["Live progress + log", "Progress bar, counter, and scrolling log of every action."],
     ["Local & private", "No password, no servers, no telemetry. Runs in your browser."],
-    ["Free + $5 unlimited", "3 unfollows free. Unlock unlimited with a one-time $5 — no subscription."],
+    ["Free + $5 unlimited", "3 unfollows free. Unlock unlimited with a $5/mo subscription — cancel anytime."],
   ];
 
   const steps = [
@@ -418,7 +418,7 @@ function landingPage() {
   const faqs = [
     ["Is this safe for my account?", "Bulk actions can trip TikTok's rate limits. The agent uses randomized delays and a Shuffle option to look less robotic. Use Dry run first, pace yourself across days for huge lists, and respect TikTok's Terms of Service. You're responsible for how you use it."],
     ["Does it need my TikTok password?", "No. It runs in your already-logged-in browser tab. It never sees or stores your password."],
-    ["Is it really free?", "Yes — 3 unfollows free, no card, no signup. Unlock unlimited for a one-time $5 via Stripe. No subscription, no recurring charge."],
+    ["Is it really free?", "Yes — 3 unfollows free, no card, no signup. Unlock unlimited for a $5/mo subscription via Stripe. Cancel anytime."],
     ["Where does it work?", "On tiktok.com/following and on the Following modal opened from any profile. Chrome only (Manifest V3)."],
     ["What if TikTok changes their layout?", "The agent uses defensive DOM hunting with multiple selectors, so it survives minor changes. Debug mode exposes extra logs to help tune selectors if needed."],
     ["Does anything leave my browser?", "No. The extension makes no network calls. The billing server only handles Stripe Checkout and unlock-key verification."],
@@ -505,7 +505,7 @@ function landingPage() {
         <ul class="hero-badges">
           <li>No password</li>
           <li>No servers</li>
-          <li>No subscription</li>
+          <li>Cancel anytime</li>
           <li>Free to try</li>
         </ul>
       </div>
@@ -532,7 +532,7 @@ function landingPage() {
     <section class="section cta-band">
       <div class="wrap cta-band-inner">
         <h2>Ready to clean your TikTok following list?</h2>
-        <p>Free to try. Unlimited for a one-time $5. No subscription.</p>
+        <p>Free to try. Unlimited for $5/mo. Cancel anytime.</p>
         ${installButton({ primary: "Add to Chrome — Free", secondary: "Download .zip" })}
       </div>
     </section>
@@ -595,7 +595,7 @@ function buildProgrammaticPage(p) {
     <section class="section cta-band">
       <div class="wrap cta-band-inner">
         <h2>${escapeHtml(p.h1)} — start free</h2>
-        <p>Free 3 unfollows. Unlimited for a one-time $5. No subscription.</p>
+        <p>Free 3 unfollows. Unlimited for $5/mo. Cancel anytime.</p>
         ${installButton({ primary: "Add to Chrome — Free", secondary: "Download .zip" })}
       </div>
     </section>`;
