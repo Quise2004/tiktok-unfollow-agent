@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TikTok Unfollow Agent",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "Bulk unfollow accounts on your TikTok following list. Pick a count or unfollow all — the agent clicks through for you.",
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
