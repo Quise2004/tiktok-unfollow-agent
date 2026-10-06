@@ -1,8 +1,11 @@
 // server.js — billing server for the TikTok Unfollow Agent Chrome extension.
 //
 // Responsibilities:
-// 1. Create a Stripe Checkout session for the one-time $5 unlock.
-// 2. Verify the completed Checkout session and return a unique unlock key.
+// 1. Return the Stripe Payment Link with a unique client_reference_id so the
+//    purchase can be matched back to this install.
+// 2. Verify a completed payment (by client_reference_id, or by Checkout
+//    Session id when the payment link's after-payment redirect is used) and
+//    return a unique unlock key.
 // 3. Let the extension verify an unlock key on demand.
 //
 // Run locally:  npm install && npm start
@@ -17,7 +20,8 @@ const sqlite3 = require("sqlite3");
 const Stripe = require("stripe");
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
+const STRIPE_PAYMENT_LINK_URL =
+  process.env.STRIPE_PAYMENT_LINK_URL || "https://buy.stripe.com/6oU5kF2XFewhcHYfoGdjO04";
 const PORT = parseInt(process.env.PORT || "4242", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 const SERVER_URL = process.env.BILLING_SERVER_URL || `http://localhost:${PORT}`;
@@ -27,8 +31,8 @@ if (!STRIPE_SECRET_KEY || !STRIPE_SECRET_KEY.startsWith("sk_")) {
   console.error("STRIPE_SECRET_KEY is missing or invalid. Set it in .env");
   process.exit(1);
 }
-if (!STRIPE_PRICE_ID || !STRIPE_PRICE_ID.startsWith("price_")) {
-  console.error("STRIPE_PRICE_ID is missing or invalid. Set it in .env");
+if (!STRIPE_PAYMENT_LINK_URL.startsWith("https://buy.stripe.com/")) {
+  console.error("STRIPE_PAYMENT_LINK_URL is missing or invalid. Set it in .env (https://buy.stripe.com/...)");
   process.exit(1);
 }
 
@@ -53,7 +57,7 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS unlock_keys (
       key TEXT PRIMARY KEY,
       session_id TEXT UNIQUE,
-      stripe_customer_id TEXT,
+      customer_id TEXT,
       created_at INTEGER DEFAULT (strftime('%s','now')),
       revoked INTEGER DEFAULT 0
     )
@@ -61,12 +65,22 @@ db.serialize(() => {
   db.run(`
     CREATE INDEX IF NOT EXISTS idx_session_id ON unlock_keys(session_id)
   `);
+  // Migrate older schema if present: stripe_customer_id -> customer_id.
+  db.all("PRAGMA table_info(unlock_keys)", (err, cols) => {
+    if (err || !cols) return;
+    if (cols.some((c) => c.name === "stripe_customer_id")) {
+      db.run("ALTER TABLE unlock_keys RENAME COLUMN stripe_customer_id TO customer_id", () => {});
+    }
+  });
 });
 
 function generateKey() {
   return "ttu_" + crypto.randomBytes(24).toString("hex");
 }
 
+// session_id stores the client_reference_id (ttu_...) we attach to the payment
+// link, or a Stripe Checkout Session id (cs_...) if the payment link's
+// after-payment redirect is configured to our /success page.
 function getKeyBySession(sessionId) {
   return new Promise((resolve, reject) => {
     db.get(
@@ -83,7 +97,7 @@ function getKeyBySession(sessionId) {
 function storeKey(key, sessionId, customerId) {
   return new Promise((resolve, reject) => {
     db.run(
-      "INSERT INTO unlock_keys (key, session_id, stripe_customer_id) VALUES (?, ?, ?)",
+      "INSERT INTO unlock_keys (key, session_id, customer_id) VALUES (?, ?, ?)",
       [key, sessionId, customerId || null],
       function (err) {
         if (err) reject(err);
@@ -104,6 +118,42 @@ function isKeyValid(key) {
       }
     );
   });
+}
+
+// ---------------------------------------------------------------- Stripe helpers
+// Resolve the payment link's plink_ id once (needed to list its sessions).
+let _paymentLinkId = null;
+async function getPaymentLinkId() {
+  if (_paymentLinkId) return _paymentLinkId;
+  const links = await stripe.paymentLinks.list({ limit: 100 });
+  const match = links.data.find((l) => l.url === STRIPE_PAYMENT_LINK_URL);
+  if (!match) {
+    throw new Error(`Payment link not found for URL ${STRIPE_PAYMENT_LINK_URL}`);
+  }
+  _paymentLinkId = match.id;
+  return _paymentLinkId;
+}
+
+// Find a paid Checkout Session on our payment link whose client_reference_id
+// matches `ref`. Sessions list returns newest first, so a just-paid session
+// is near the top; paginate a few pages as a safety net.
+async function findPaidSessionByRef(ref) {
+  const linkId = await getPaymentLinkId();
+  let startingAfter;
+  for (let page = 0; page < 10; page++) {
+    const list = await stripe.checkout.sessions.list({
+      payment_link: linkId,
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    });
+    const hit = list.data.find(
+      (s) => s.client_reference_id === ref && s.payment_status === "paid"
+    );
+    if (hit) return hit;
+    if (!list.has_more || list.data.length === 0) return null;
+    startingAfter = list.data[list.data.length - 1].id;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- routes
@@ -129,50 +179,21 @@ app.get("/p/:slug", (req, res, next) => {
   res.sendFile(file, (err) => { if (err) next(); });
 });
 
-// Create a Stripe Checkout session for the $5 unlock.
-// The extension calls this, opens the returned URL, and waits for payment.
-// We try "payment" mode first (one-time). If the price is recurring, we
-// fall back to "subscription" mode automatically.
-app.post("/create-checkout-session", async (req, res) => {
-  const baseParams = {
-    line_items: [
-      {
-        price: STRIPE_PRICE_ID,
-        quantity: 1,
-      },
-    ],
-    success_url: `${SERVER_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${SERVER_URL}/cancel`,
-    metadata: { source: "tt-unfollow-extension" },
-  };
-
-  // Try one-time payment mode first.
-  try {
-    const session = await stripe.checkout.sessions.create({
-      ...baseParams,
-      mode: "payment",
-    });
-    return res.json({ ok: true, url: session.url, session_id: session.id });
-  } catch (err) {
-    // If the price is recurring, switch to subscription mode.
-    if (err && err.message && err.message.includes("recurring price")) {
-      try {
-        const session = await stripe.checkout.sessions.create({
-          ...baseParams,
-          mode: "subscription",
-        });
-        return res.json({ ok: true, url: session.url, session_id: session.id });
-      } catch (err2) {
-        console.error("create-checkout-session (subscription) error:", err2);
-        return res.status(500).json({ ok: false, error: "stripe_error", detail: err2.message });
-      }
-    }
-    console.error("create-checkout-session error:", err);
-    return res.status(500).json({ ok: false, error: "stripe_error", detail: err.message });
-  }
+// Return the Stripe Payment Link with a unique client_reference_id. The
+// extension opens it in a new tab; Stripe records the reference on the
+// resulting Checkout Session, which /verify-session uses to match the
+// payment back to this request.
+app.post("/create-checkout-session", (_req, res) => {
+  const ref = "ttu_" + crypto.randomBytes(24).toString("hex");
+  const join = STRIPE_PAYMENT_LINK_URL.includes("?") ? "&" : "?";
+  const url = `${STRIPE_PAYMENT_LINK_URL}${join}client_reference_id=${encodeURIComponent(ref)}`;
+  res.json({ ok: true, url, session_id: ref });
 });
 
-// Success page shown after Stripe payment. The extension can close this tab.
+// Success page shown after Stripe payment (only reached if the payment link's
+// "after payment" redirect is configured to this URL — recommended:
+// `${SERVER_URL}/success?session_id={CHECKOUT_SESSION_ID}`).
+// The extension can close this tab.
 app.get("/success", (req, res) => {
   const sessionId = req.query.session_id || "";
   res.send(`
@@ -201,8 +222,10 @@ app.get("/cancel", (_req, res) => {
   `);
 });
 
-// Verify a completed Stripe Checkout session and return an unlock key.
-// The extension polls this after the user pays.
+// Verify a payment and return an unlock key. The extension polls this after
+// the user pays. session_id is either the client_reference_id (ttu_...) we
+// attached to the payment link, or a Checkout Session id (cs_...) coming from
+// the /success redirect.
 app.post("/verify-session", async (req, res) => {
   const { session_id } = req.body || {};
   if (!session_id || typeof session_id !== "string") {
@@ -210,7 +233,7 @@ app.post("/verify-session", async (req, res) => {
   }
 
   try {
-    // Check if we already issued a key for this session.
+    // Check if we already issued a key for this session/reference.
     let row = await getKeyBySession(session_id);
     if (row) {
       if (row.revoked) {
@@ -219,14 +242,20 @@ app.post("/verify-session", async (req, res) => {
       return res.json({ ok: true, key: row.key });
     }
 
-    // Otherwise, verify the session with Stripe.
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-    if (session.payment_status !== "paid") {
+    // Otherwise, verify the payment with Stripe.
+    let paidSession = null;
+    if (session_id.startsWith("cs_")) {
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      if (session.payment_status === "paid") paidSession = session;
+    } else {
+      paidSession = await findPaidSessionByRef(session_id);
+    }
+    if (!paidSession) {
       return res.json({ ok: false, error: "not_paid" });
     }
 
     const key = generateKey();
-    await storeKey(key, session_id, session.customer || null);
+    await storeKey(key, session_id, paidSession.customer || null);
     console.log(`Issued unlock key ${key} for session ${session_id}`);
     return res.json({ ok: true, key });
   } catch (err) {

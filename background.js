@@ -1,7 +1,7 @@
 // background.js — service worker.
 // Mostly a relay: forwards messages from the popup to the content script
 // (and vice versa). Also opens TikTok on install so the user can log in.
-// Finally, watches for the Stripe Checkout post-payment redirect to the
+// Finally, watches for the Stripe post-payment redirect to the
 // Render billing server's /success page and verifies the session to unlock
 // unlimited mode persistently (the popup may be closed during payment).
 
@@ -29,12 +29,13 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 // ---------------------------------------------------------------- payment unlock
-// The buy button creates a Stripe Checkout session via the Render backend.
-// After payment, Stripe redirects to the billing server's /success?session_id=
-// page. We watch for that redirect here (in the service worker, which persists
-// even when the popup is closed), verify the session with the billing server,
-// and flip unlimitedUnlocked on in storage. Any open popup is notified so it
-// can refresh its UI.
+// The buy button opens a Stripe Payment Link via the Render backend.
+// If the payment link's after-payment redirect is configured to the billing
+// server's /success?session_id={CHECKOUT_SESSION_ID} page, we watch for that
+// redirect here (in the service worker, which persists even when the popup is
+// closed), verify the session with the billing server, and flip
+// unlimitedUnlocked on in storage. Any open popup is notified so it can
+// refresh its UI.
 chrome.tabs.onUpdated.addListener(async (_tabId, _info, tab) => {
   if (!tab || !tab.url) return;
   let u;

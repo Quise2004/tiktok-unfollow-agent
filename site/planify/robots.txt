@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://tiktok-unfollower-extension.vercel.app/sitemap.xml

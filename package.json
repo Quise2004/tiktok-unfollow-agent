@@ -1,7 +1,7 @@
 {
   "name": "tiktok-unfollow-agent-billing",
   "version": "1.0.0",
-  "description": "Billing server for the TikTok Unfollow Agent Chrome extension. Creates Stripe Checkout sessions and verifies unlock payments.",
+  "description": "Billing server for the TikTok Unfollow Agent Chrome extension. Verifies Stripe Payment Link purchases and issues unlock keys.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

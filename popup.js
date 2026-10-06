@@ -238,7 +238,46 @@ async function setUnlimited(unlocked) {
   await loadQuota();
 }
 
-// --- Buy button (Stripe Checkout via Render backend) ---
+// --- Buy button (Stripe Payment Link via Render backend) ---
+// Polls /verify-session until the payment confirms or times out. The pending
+// reference is persisted in chrome.storage so polling can resume if the popup
+// is closed while the user is still paying.
+function startPaymentPoll(sessionId) {
+  let attempts = 0;
+  const maxAttempts = 120; // 5 minutes at 2.5s intervals
+  const poll = setInterval(async () => {
+    attempts++;
+    if (attempts >= maxAttempts) {
+      clearInterval(poll);
+      await chrome.storage.local.remove("__pendingPaymentRef");
+      payStatus.className = "pay-status err";
+      payStatus.textContent = "Timed out waiting for payment. Try again.";
+      buyBtn.disabled = false;
+      buyBtn.textContent = "Unlock Unlimited — $5";
+      return;
+    }
+    try {
+      const vres = await fetch(`${BILLING_SERVER_URL}/verify-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const vjson = await vres.json();
+      if (vjson.ok && vjson.key) {
+        clearInterval(poll);
+        await chrome.storage.local.remove("__pendingPaymentRef");
+        // Payment confirmed — unlock unlimited immediately.
+        await setUnlimited(true);
+        payStatus.className = "pay-status ok";
+        payStatus.textContent = "Payment confirmed! Unlimited unlocked.";
+        pushLog("Unlimited unlocked via Stripe payment", "ok");
+        buyBtn.disabled = false;
+        buyBtn.textContent = "Unlock Unlimited — $5";
+      }
+    } catch (_) { /* keep polling */ }
+  }, 2500);
+}
+
 buyBtn.addEventListener("click", async () => {
   buyBtn.disabled = true;
   buyBtn.textContent = "Creating checkout...";
@@ -260,45 +299,16 @@ buyBtn.addEventListener("click", async () => {
       return;
     }
 
-    // Open Stripe Checkout in new tab.
+    // Persist the pending reference so the poll can resume on popup reopen.
+    const sessionId = json.session_id;
+    await chrome.storage.local.set({ __pendingPaymentRef: sessionId });
+
+    // Open Stripe Payment Link in new tab.
     chrome.tabs.create({ url: json.url });
     payStatus.className = "pay-status";
     payStatus.textContent = "Complete payment in the new tab. Waiting for confirmation...";
     buyBtn.textContent = "Waiting for payment...";
-
-    // Poll until paid.
-    const sessionId = json.session_id;
-    let attempts = 0;
-    const maxAttempts = 120; // 5 minutes at 2.5s intervals
-    const poll = setInterval(async () => {
-      attempts++;
-      if (attempts >= maxAttempts) {
-        clearInterval(poll);
-        payStatus.className = "pay-status err";
-        payStatus.textContent = "Timed out waiting for payment. Try again.";
-        buyBtn.disabled = false;
-        buyBtn.textContent = "Unlock Unlimited — $5";
-        return;
-      }
-      try {
-        const vres = await fetch(`${BILLING_SERVER_URL}/verify-session`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId }),
-        });
-        const vjson = await vres.json();
-        if (vjson.ok && vjson.key) {
-          clearInterval(poll);
-          // Payment confirmed — unlock unlimited immediately.
-          await setUnlimited(true);
-          payStatus.className = "pay-status ok";
-          payStatus.textContent = "Payment confirmed! Unlimited unlocked.";
-          pushLog("Unlimited unlocked via Stripe payment", "ok");
-          buyBtn.disabled = false;
-          buyBtn.textContent = "Unlock Unlimited — $5";
-        }
-      } catch (_) { /* keep polling */ }
-    }, 2500);
+    startPaymentPoll(sessionId);
   } catch (e) {
     payStatus.className = "pay-status err";
     payStatus.textContent = "Can't reach billing server. Make sure it's running.";
@@ -564,6 +574,17 @@ autostartCancel.addEventListener("click", () => {
 
   // Load quota (non-blocking on server check).
   try { await loadQuota(); } catch (_) {}
+
+  // Resume a pending payment poll if the popup was closed mid-payment.
+  try {
+    const { __pendingPaymentRef, unlimitedUnlocked } =
+      await chrome.storage.local.get(["__pendingPaymentRef", "unlimitedUnlocked"]);
+    if (__pendingPaymentRef && !unlimitedUnlocked) {
+      payStatus.className = "pay-status";
+      payStatus.textContent = "Waiting for payment confirmation...";
+      startPaymentPoll(__pendingPaymentRef);
+    }
+  } catch (_) {}
 
   // Ping content script.
   try {

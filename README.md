@@ -56,8 +56,8 @@ optionally randomize order, and watch progress in the popup. Nothing leaves your
   **Unfollow**, scrolls to load more, and reports `PROGRESS` / `LOG` / `DONE`
   back to the popup. Enforces the free-tier cap.
 - `background.js` — minimal service worker; opens the following page on install.
-- `server.js` — Express + Stripe billing server. Creates Checkout sessions,
-  verifies payments, and stores unlock keys in SQLite.
+- `server.js` — Express + Stripe billing server. Serves a Payment Link with a
+  unique reference, verifies payments, and stores unlock keys in SQLite.
 - `icons/` — generated PNG icons (see `generate-icons.js`).
 
 ## Free tier & unlocking unlimited
@@ -65,17 +65,20 @@ optionally randomize order, and watch progress in the popup. Nothing leaves your
 - Free users can unfollow **3 accounts** total (stored in `chrome.storage.local`).
 - The popup shows how many are left, a **Buy unlimited unlock — $5** button, and
   a **Verify key** field.
-- Payments go through Stripe Checkout. The server issues a unique unlock key
-  only after the Checkout session is `paid`.
+- Payments go through a Stripe Payment Link. The server issues a unique
+  unlock key only after the matching Checkout Session is `paid`.
 
 ## Run the billing server
 
-1. Create a Stripe product + price at <https://dashboard.stripe.com/products>
-   for $5. Copy the **Price ID** (`price_...`).
-2. Copy `.env.example` to `.env` and fill in your **new** keys:
-   - `STRIPE_SECRET_KEY` — your **new** secret key (rotate the leaked one)
-   - `STRIPE_PUBLISHABLE_KEY` — publishable key
-   - `STRIPE_PRICE_ID` — the price ID from step 1
+1. Create a Stripe Payment Link at <https://dashboard.stripe.com/payment-links>
+   for the $5 unlock. Copy the link URL (`https://buy.stripe.com/...`).
+2. (Recommended) In the payment link's settings, set **After payment →
+   Redirect customers to your website** to
+   `https://your-billing-domain/success?session_id={CHECKOUT_SESSION_ID}`
+   so the extension unlocks even if the popup was closed during payment.
+3. Copy `.env.example` to `.env` and fill in your keys:
+   - `STRIPE_SECRET_KEY` — your secret key
+   - `STRIPE_PAYMENT_LINK_URL` — the payment link URL from step 1
    - `BILLING_SERVER_URL` — `http://localhost:4242` for local testing
    - `CORS_ORIGIN` — `*` for local testing; restrict to your extension origin in production
 3. Install dependencies and start:
@@ -89,12 +92,14 @@ optionally randomize order, and watch progress in the popup. Nothing leaves your
 
 ## Production checklist
 
-- Rotate the Stripe secret key that was leaked in chat.
 - Restrict `CORS_ORIGIN` to your Chrome extension ID (`chrome-extension://YOUR_ID`).
 - Serve the billing server over HTTPS.
+- Configure the payment link's after-payment redirect (step 2 above) so
+  background verification works even when the popup is closed.
 - Keep `.env` and `billing.db` out of git (already ignored by `.gitignore`).
 - Add rate limiting and input validation to `server.js` before taking real payments.
-- Consider Stripe webhook verification for stronger payment guarantees.
+- Consider a Stripe `checkout.session.completed` webhook for durable payment
+  fulfillment.
 
 ## Regenerate icons
 
