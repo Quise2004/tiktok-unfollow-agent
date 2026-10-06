@@ -222,6 +222,19 @@
       font-size: 12px; font-weight: 600;
     }
 
+    .cancel-sub {
+      display: block;
+      margin: 8px auto 0;
+      padding: 0;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 11px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .cancel-sub:hover { color: var(--err); }
+
     /* Options */
     .opts {
       display: flex; flex-wrap: wrap; gap: 12px;
@@ -558,6 +571,7 @@
       <div class="unlocked-banner hidden" id="unlockedBanner">
         <span>&#10003;</span> Unlimited mode active
       </div>
+      <button class="cancel-sub hidden" id="cancelSubBtn">Cancel subscription</button>
     </div>
 
     <!-- Options -->

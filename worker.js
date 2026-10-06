@@ -6,6 +6,8 @@
 //   POST /create-checkout-session  -> { ok, url, session_id }
 //   POST /verify-session           -> { ok, key } (session_id = ttu_ ref or cs_ id)
 //   POST /verify-key               -> { ok, unlimited }
+//   POST /cancel-subscription      -> { ok, canceled } — instantly cancels all
+//                                     active subscriptions for the customer
 //   GET  /success, /cancel         -> post-payment landing pages
 //
 // Storage: D1 table `unlock_keys` (same schema as the old SQLite billing.db).
@@ -52,6 +54,18 @@ async function stripeGet(env, path) {
   return body;
 }
 
+async function stripeDelete(env, path) {
+  const res = await fetch(`${STRIPE_API}${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(body && body.error ? body.error.message : `stripe ${res.status}`);
+  }
+  return body;
+}
+
 // Resolve the payment link's plink_ id (cached on the isolate).
 let _paymentLinkId = null;
 async function getPaymentLinkId(env) {
@@ -85,7 +99,7 @@ async function findPaidSessionByRef(env, ref) {
 // ---------------------------------------------------------------- D1 helpers
 async function getKeyBySession(env, sessionId) {
   return env.DB.prepare(
-    "SELECT key, revoked FROM unlock_keys WHERE session_id = ?"
+    "SELECT key, revoked, customer_id FROM unlock_keys WHERE session_id = ?"
   ).bind(sessionId).first();
 }
 
@@ -182,6 +196,55 @@ export default {
       } catch (err) {
         console.error("verify-session error:", err);
         return json({ ok: false, error: "verification_failed" }, 500, cors);
+      }
+    }
+
+    // Instantly cancel every active/trialing/past_due subscription for the
+    // customer behind this purchase reference, and revoke their unlock key.
+    // If they only made a one-time payment, canceled comes back 0 and the key
+    // stays valid.
+    if (url.pathname === "/cancel-subscription" && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const sessionId = body.session_id;
+      if (!sessionId || typeof sessionId !== "string") {
+        return json({ ok: false, error: "missing_session_id" }, 400, cors);
+      }
+      try {
+        let customerId = null;
+        const row = await getKeyBySession(env, sessionId);
+        if (row && row.customer_id) customerId = row.customer_id;
+
+        if (!customerId) {
+          let session = null;
+          if (sessionId.startsWith("cs_")) {
+            session = await stripeGet(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`);
+          } else {
+            session = await findPaidSessionByRef(env, sessionId);
+          }
+          customerId = session && session.customer;
+        }
+        if (!customerId) {
+          return json({ ok: false, error: "customer_not_found" }, 200, cors);
+        }
+
+        const subs = await stripeGet(env,
+          `/subscriptions?customer=${encodeURIComponent(customerId)}&limit=100`
+        );
+        const cancellable = (subs.data || []).filter(
+          (s) => s.status === "active" || s.status === "trialing" || s.status === "past_due"
+        );
+        for (const s of cancellable) {
+          await stripeDelete(env, `/subscriptions/${s.id}`);
+        }
+
+        if (cancellable.length > 0) {
+          await env.DB.prepare("UPDATE unlock_keys SET revoked = 1 WHERE session_id = ?")
+            .bind(sessionId).run();
+        }
+        return json({ ok: true, canceled: cancellable.length }, 200, cors);
+      } catch (err) {
+        console.error("cancel-subscription error:", err);
+        return json({ ok: false, error: "cancel_failed" }, 500, cors);
       }
     }
 

@@ -84,7 +84,7 @@ function generateKey() {
 function getKeyBySession(sessionId) {
   return new Promise((resolve, reject) => {
     db.get(
-      "SELECT key, revoked FROM unlock_keys WHERE session_id = ?",
+      "SELECT key, revoked, customer_id FROM unlock_keys WHERE session_id = ?",
       [sessionId],
       (err, row) => {
         if (err) reject(err);
@@ -261,6 +261,53 @@ app.post("/verify-session", async (req, res) => {
   } catch (err) {
     console.error("verify-session error:", err);
     return res.status(500).json({ ok: false, error: "verification_failed" });
+  }
+});
+
+// Instantly cancel every active/trialing/past_due subscription for the
+// customer behind this purchase reference, and revoke their unlock key.
+// One-time purchases come back with canceled: 0 and the key stays valid.
+app.post("/cancel-subscription", async (req, res) => {
+  const { session_id } = req.body || {};
+  if (!session_id || typeof session_id !== "string") {
+    return res.status(400).json({ ok: false, error: "missing_session_id" });
+  }
+  try {
+    let customerId = null;
+    const row = await getKeyBySession(session_id);
+    if (row && row.customer_id) customerId = row.customer_id;
+
+    if (!customerId) {
+      let session = null;
+      if (session_id.startsWith("cs_")) {
+        session = await stripe.checkout.sessions.retrieve(session_id);
+      } else {
+        session = await findPaidSessionByRef(session_id);
+      }
+      customerId = session && session.customer;
+    }
+    if (!customerId) {
+      return res.json({ ok: false, error: "customer_not_found" });
+    }
+
+    const subs = await stripe.subscriptions.list({ customer: customerId, limit: 100 });
+    const cancellable = subs.data.filter(
+      (s) => s.status === "active" || s.status === "trialing" || s.status === "past_due"
+    );
+    for (const s of cancellable) {
+      await stripe.subscriptions.cancel(s.id);
+    }
+
+    if (cancellable.length > 0) {
+      await new Promise((resolve, reject) =>
+        db.run("UPDATE unlock_keys SET revoked = 1 WHERE session_id = ?", [session_id],
+          (err) => (err ? reject(err) : resolve()))
+      );
+    }
+    return res.json({ ok: true, canceled: cancellable.length });
+  } catch (err) {
+    console.error("cancel-subscription error:", err);
+    return res.status(500).json({ ok: false, error: "cancel_failed" });
   }
 });
 

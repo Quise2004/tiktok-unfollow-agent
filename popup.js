@@ -22,6 +22,7 @@ const buySection = $("buySection");
 const buyBtn = $("buyBtn");
 const payStatus = $("payStatus");
 const unlockedBanner = $("unlockedBanner");
+const cancelSubBtn = $("cancelSubBtn");
 const progressWrap = $("progressWrap");
 const progressFill = $("progressFill");
 const doneLabel = $("doneLabel");
@@ -75,7 +76,7 @@ function showToast(text, cls) {
 
 // Blocking modal alert popup. Used for important messages (errors, completions)
 // so they show as a real popup dialog instead of just a line in the log.
-// opts: { title, cls, okText, onOk, upgrade: bool }
+// opts: { title, cls, okText, onOk, upgrade: bool, action: {text, onClick} }
 function showAlert(msg, opts) {
   opts = opts || {};
   const cls = opts.cls || "info";
@@ -111,6 +112,18 @@ function showAlert(msg, opts) {
       buyBtn.click();
     });
     actions.insertBefore(upBtn, okBtn);
+  }
+
+  // Optional custom action button (e.g. confirm-cancel for subscriptions).
+  if (opts.action && typeof opts.action.onClick === "function") {
+    const aBtn = document.createElement("button");
+    aBtn.className = "modal-btn upgrade";
+    aBtn.textContent = opts.action.text || "Confirm";
+    aBtn.addEventListener("click", () => {
+      overlay.classList.remove("show");
+      opts.action.onClick();
+    });
+    actions.insertBefore(aBtn, okBtn);
   }
 
   overlay.classList.add("show");
@@ -222,6 +235,7 @@ function renderQuota(used, unlimited) {
     quotaBadge.className = "badge unlimited";
     buySection.classList.add("hidden");
     unlockedBanner.classList.remove("hidden");
+    cancelSubBtn.classList.remove("hidden");
   } else {
     const left = Math.max(0, FREE_TIER_LIMIT - used);
     quotaLabel.textContent = "Free Plan";
@@ -230,6 +244,7 @@ function renderQuota(used, unlimited) {
     quotaBadge.className = "badge";
     buySection.classList.remove("hidden");
     unlockedBanner.classList.add("hidden");
+    cancelSubBtn.classList.add("hidden");
   }
 }
 
@@ -266,7 +281,9 @@ function startPaymentPoll(sessionId) {
       if (vjson.ok && vjson.key) {
         clearInterval(poll);
         await chrome.storage.local.remove("__pendingPaymentRef");
-        // Payment confirmed — unlock unlimited immediately.
+        // Payment confirmed — unlock unlimited immediately. Keep the purchase
+        // reference so "Cancel subscription" can find the Stripe customer.
+        await chrome.storage.local.set({ __paidSessionRef: sessionId });
         await setUnlimited(true);
         payStatus.className = "pay-status ok";
         payStatus.textContent = "Payment confirmed! Unlimited unlocked.";
@@ -316,6 +333,50 @@ buyBtn.addEventListener("click", async () => {
     buyBtn.textContent = "Unlock Unlimited — $5";
   }
 });
+
+// --- Cancel subscription (unlocked users) ---
+// Instantly cancels every active Stripe subscription for the customer behind
+// this purchase. One-time payments return canceled: 0 — nothing to cancel.
+cancelSubBtn.addEventListener("click", () => {
+  showAlert("This instantly cancels your Stripe subscription and removes Unlimited access. No refund is issued.", {
+    cls: "warn",
+    title: "Cancel subscription?",
+    okText: "Keep subscription",
+    action: { text: "Cancel my subscription", onClick: cancelSubscription },
+  });
+});
+
+async function cancelSubscription() {
+  try {
+    const { __paidSessionRef } = await chrome.storage.local.get("__paidSessionRef");
+    if (!__paidSessionRef) {
+      showAlert("No purchase reference found on this device.", { cls: "err", title: "Can't cancel" });
+      return;
+    }
+    const res = await fetch(`${BILLING_SERVER_URL}/cancel-subscription`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: __paidSessionRef }),
+    });
+    const json = await res.json();
+    if (json.ok && json.canceled > 0) {
+      await setUnlimited(false);
+      await chrome.storage.local.remove("__paidSessionRef");
+      pushLog("Stripe subscription canceled — unlimited removed", "warn");
+      showAlert("Subscription canceled. Unlimited access has been removed.", {
+        cls: "ok", title: "Canceled", okText: "OK",
+      });
+    } else if (json.ok) {
+      showAlert("No active subscription found — your unlock was a one-time payment, so there's nothing to cancel.", {
+        cls: "info", title: "Nothing to cancel", okText: "OK",
+      });
+    } else {
+      showAlert("Couldn't cancel: " + (json.error || "unknown error"), { cls: "err" });
+    }
+  } catch (e) {
+    showAlert("Can't reach billing server. Try again later.", { cls: "err" });
+  }
+}
 
 // ================================================================ Tab / content script
 async function getTikTokTab() {

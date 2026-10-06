@@ -63,7 +63,7 @@ chrome.tabs.onUpdated.addListener(async (_tabId, _info, tab) => {
       });
       const json = await res.json();
       if (json.ok && json.key) {
-        await chrome.storage.local.set({ unlimitedUnlocked: true });
+        await chrome.storage.local.set({ unlimitedUnlocked: true, __paidSessionRef: sessionId });
         // Notify any open popup so it can refresh its quota UI immediately.
         try {
           await chrome.runtime.sendMessage({ source: "tt-unfollow", type: "PAYMENT_UNLOCKED" });
